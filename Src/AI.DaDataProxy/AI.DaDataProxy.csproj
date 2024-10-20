@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\AI.DaDataProxy.Http.Contracts\AI.DaDataProxy.Http.Contracts.csproj" />
+        <ProjectReference Include="..\AI.DaDataProxy.Entities\AI.DaDataProxy.Entities.csproj" />
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="FluentValidation" />
+        <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" />
+    </ItemGroup>
+    <ItemGroup>
+        <InternalsVisibleTo Include="AI.DaDataProxy.Host" />
+        <InternalsVisibleTo Include="AI.DaDataProxy.Tests" />
+    </ItemGroup>
+</Project>
