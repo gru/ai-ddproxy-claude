@@ -1,68 +1,75 @@
-﻿using AI.DaDataProxy.Entities;
-using AI.DaDataProxy.Http.Contracts;
-using FluentValidation;
+﻿using System.Security.Cryptography;
+using System.Text;
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Options;
 
 namespace AI.DaDataProxy.DaData;
 
 /// <summary>
-/// Handles business logic operations related to DaDatas.
-/// This class is responsible for creating and retrieving DaData entities.
+/// Обработчик запросов к сервису DaData с поддержкой кеширования.
 /// </summary>
 public class DaDataHandler
 {
-    private readonly DaDataProxyDbContext _dbContext;
-    private readonly IValidator<CreateDaDataCommand> _validator;
+    private readonly IDaDataApi _daDataApi;
+    private readonly IDistributedCache _cache;
+    private readonly DaDataOptions _options;
 
     /// <summary>
-    /// Initializes a new instance of the DaDataHandler class.
+    /// Инициализирует новый экземпляр класса <see cref="DaDataHandler"/>.
     /// </summary>
-    /// <param name="dbContext">The database context for accessing DaData entities.</param>
-    /// <param name="validator">The validator for CreateDaDataCommand.</param>
-    public DaDataHandler(DaDataProxyDbContext dbContext, IValidator<CreateDaDataCommand> validator)
+    /// <param name="daDataApi">Интерфейс для взаимодействия с API DaData.</param>
+    /// <param name="cache">Распределенный кеш для хранения результатов запросов.</param>
+    /// <param name="options">Настройки DaData.</param>
+    public DaDataHandler(IDaDataApi daDataApi, IDistributedCache cache, IOptions<DaDataOptions> options)
     {
-        _dbContext = dbContext;
-        _validator = validator;
+        _daDataApi = daDataApi;
+        _cache = cache;
+        _options = options.Value;
     }
 
     /// <summary>
-    /// Creates a new DaData entity based on the provided command.
+    /// Обрабатывает запрос к DaData с поддержкой кеширования.
     /// </summary>
-    /// <param name="command">The command containing details for creating the DaData.</param>
-    /// <param name="cancellationToken">A token to cancel the operation if needed.</param>
-    /// <returns>The ID of the newly created DaData.</returns>
-    /// <exception cref="ValidationException">Thrown when the command fails validation.</exception>
-    public async Task<long> CreateDaData(CreateDaDataCommand command, CancellationToken cancellationToken)
+    /// <param name="path">Путь API запроса.</param>
+    /// <param name="body">Тело запроса в формате JSON.</param>
+    /// <param name="cacheExpiration">Необязательный параметр. Время жизни кеша для этого запроса.</param>
+    /// <returns>Результат запроса в формате JSON.</returns>
+    public async Task<string> HandleRequestAsync(string path, string body, TimeSpan? cacheExpiration = null)
     {
-        await _validator.ValidateAndThrowAsync(command, cancellationToken);
+        var cacheKey = GenerateCacheKey(path, body);
+        var cachedResult = await _cache.GetStringAsync(cacheKey);
 
-        var aggregate = new DaDataEntity
+        if (cachedResult != null)
         {
-            Name = command.Name
-        };
-
-        _dbContext.DaDatas.Add(aggregate);
-        
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        return aggregate.Id;
-    }
-
-    /// <summary>
-    /// Retrieves an DaData entity by its ID.
-    /// </summary>
-    /// <param name="id">The unique identifier of the DaData to retrieve.</param>
-    /// <param name="cancellationToken">A token to cancel the operation if needed.</param>
-    /// <returns>The retrieved DaDataEntity.</returns>
-    /// <exception cref="InvalidOperationException">Thrown when an DaData with the specified ID is not found.</exception>
-    public async Task<DaDataEntity> GetDaData(long id, CancellationToken cancellationToken)
-    {
-        var aggregate = await _dbContext.DaDatas.FindAsync([id], cancellationToken);
-            
-        if (aggregate == null)
-        {
-            throw new InvalidOperationException($"DaData with id {id} not found");
+            return cachedResult;
         }
 
-        return aggregate;
+        var result = await _daDataApi.ProxyRequestAsync(path, body);
+
+        if (!string.IsNullOrEmpty(result))
+        {
+            var cacheEntryOptions = new DistributedCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = cacheExpiration ?? TimeSpan.FromMinutes(60)
+            };
+
+            await _cache.SetStringAsync(cacheKey, result, cacheEntryOptions);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Генерирует уникальный ключ кеша на основе пути и тела запроса.
+    /// </summary>
+    /// <param name="path">Путь API запроса.</param>
+    /// <param name="body">Тело запроса в формате JSON.</param>
+    /// <returns>Уникальный ключ кеша.</returns>
+    private static string GenerateCacheKey(string path, string body)
+    {
+        using var sha256 = SHA256.Create();
+        var inputBytes = Encoding.UTF8.GetBytes($"{path}:{body}");
+        var hashBytes = sha256.ComputeHash(inputBytes);
+        return Convert.ToBase64String(hashBytes);
     }
 }
