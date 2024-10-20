@@ -1,6 +1,5 @@
 ﻿using AI.DaDataProxy.DaData;
 using Microsoft.AspNetCore.Mvc;
-using Asp.Versioning;
 using Microsoft.FeatureManagement.Mvc;
 
 namespace AI.DaDataProxy.Host.Controllers;

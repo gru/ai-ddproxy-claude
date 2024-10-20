@@ -85,6 +85,10 @@ builder.Services.AddOptions<DaDataOptions>()
     .Bind(builder.Configuration.GetSection("DaData"))
     .ValidateDataAnnotations();
 
+builder.Services.AddOptions<DaDataCachingOptions>()
+    .Bind(builder.Configuration.GetSection("DaDataCaching"))
+    .ValidateDataAnnotations();
+
 builder.Services
     .AddRestEaseClient<IDaDataApi>()
     .ConfigureHttpClient((provider, client) =>
