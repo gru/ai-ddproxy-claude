@@ -13,8 +13,8 @@ using Swashbuckle.AspNetCore.SwaggerGen;
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
-using RestEase;
 using RestEase.HttpClientFactory;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -76,10 +76,8 @@ builder.Services.AddProblemDetails(options =>
     };
 });
 
-builder.Services.AddStackExchangeRedisCache(options =>
-{
-    options.Configuration = builder.Configuration.GetConnectionString("Redis");
-});
+builder.Services.AddSingleton<IConnectionMultiplexer>(_ => 
+    ConnectionMultiplexer.Connect(builder.Configuration.GetConnectionString("Redis")));
 
 builder.Services.AddOptions<DaDataOptions>()
     .Bind(builder.Configuration.GetSection("DaData"))

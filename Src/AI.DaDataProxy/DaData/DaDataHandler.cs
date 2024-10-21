@@ -1,57 +1,67 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Options;
 using AI.DaDataProxy.Validators;
+using StackExchange.Redis;
 
 namespace AI.DaDataProxy.DaData;
 
-/// <summary>
-/// Обработчик запросов к сервису DaData с поддержкой кеширования и специальной обработкой ИНН.
-/// </summary>
 public class DaDataHandler
 {
     private readonly IDaDataApi _daDataApi;
-    private readonly IDistributedCache _cache;
     private readonly DaDataOptions _options;
     private readonly DaDataCachingOptions _cachingOptions;
+    private readonly IConnectionMultiplexer _redisConnection;
 
     public DaDataHandler(
         IDaDataApi daDataApi, 
-        IDistributedCache cache, 
         IOptions<DaDataOptions> options,
-        IOptions<DaDataCachingOptions> cachingOptions)
+        IOptions<DaDataCachingOptions> cachingOptions,
+        IConnectionMultiplexer redisConnection)
     {
         _daDataApi = daDataApi;
-        _cache = cache;
         _options = options.Value;
         _cachingOptions = cachingOptions.Value;
+        _redisConnection = redisConnection;
     }
 
     public async Task<string> HandleRequestAsync(string path, string body)
     {
-        var cacheKey = GenerateCacheKey(path, body);
-        var cachedResult = await _cache.GetStringAsync(cacheKey);
+        var counterKey = $"dadata:daily_request_counter:{DateTime.UtcNow:yyyyMMdd}";
+        long currentCount = 0;
 
-        if (cachedResult != null)
+        if (_cachingOptions.DailyRequestLimit > 0)
         {
-            return cachedResult;
+            currentCount = await GetDailyRequestCount(counterKey);
+            if (currentCount >= _cachingOptions.DailyRequestLimit)
+            {
+                throw new Exception("Daily request limit exceeded");
+            }
+        }
+
+        var cacheKey = GenerateCacheKey(path, body);
+        var db = _redisConnection.GetDatabase();
+        var cachedResult = await db.StringGetAsync(cacheKey);
+
+        if (!cachedResult.IsNullOrEmpty)
+        {
+            return cachedResult!;
         }
 
         var result = await _daDataApi.ProxyRequestAsync(path, body);
 
         if (!string.IsNullOrEmpty(result))
         {
-            var cacheExpiration = GetCacheExpirationForRequest(path, body, result);
-            var cacheEntryOptions = new DistributedCacheEntryOptions
+            // Инкрементируем счетчик только после успешного запроса
+            if (_cachingOptions.DailyRequestLimit > 0)
             {
-                AbsoluteExpirationRelativeToNow = cacheExpiration
-            };
+                await IncrementDailyRequestCounter(counterKey, currentCount);
+            }
 
-            await _cache.SetStringAsync(cacheKey, result, cacheEntryOptions);
+            var cacheExpiration = GetCacheExpirationForRequest(path, body, result);
+            await db.StringSetAsync(cacheKey, result, cacheExpiration);
 
-            // Специальная обработка для запросов по ИНН
             if (IsLegalEntityByInnRequest(path))
             {
                 await CreateAdditionalInnCache(body, result, cacheExpiration);
@@ -61,6 +71,34 @@ public class DaDataHandler
         return result;
     }
 
+    private async Task<long> GetDailyRequestCount(string counterKey)
+    {
+        var db = _redisConnection.GetDatabase();
+        var currentCount = await db.StringGetAsync(counterKey);
+        return currentCount.HasValue ? (long)currentCount : 0;
+    }
+
+    private async Task IncrementDailyRequestCounter(string counterKey, long currentCount)
+    {
+        var db = _redisConnection.GetDatabase();
+
+        var transaction = db.CreateTransaction();
+        var incrementTask = transaction.StringIncrementAsync(counterKey);
+
+        // Устанавливаем время жизни ключа только если это новый ключ (текущее значение 0)
+        if (currentCount == 0)
+        {
+            await transaction.KeyExpireAsync(counterKey, TimeSpan.FromHours(_cachingOptions.RequestCounterExpirationHours));
+        }
+        
+        if (!await transaction.ExecuteAsync())
+        {
+            throw new Exception("Failed to increment request counter");
+        }
+
+        await incrementTask;
+    }
+    
     private TimeSpan GetCacheExpirationForRequest(string path, string body, string result)
     {
         if (IsLegalEntityByInnRequest(path))
@@ -94,10 +132,8 @@ public class DaDataHandler
             if (InnValidator.IsValid(inn))
             {
                 var innCacheKey = $"inn:{inn}";
-                await _cache.SetStringAsync(innCacheKey, result, new DistributedCacheEntryOptions
-                {
-                    AbsoluteExpirationRelativeToNow = expiration
-                });
+                var db = _redisConnection.GetDatabase();
+                await db.StringSetAsync(innCacheKey, result, expiration);
             }
         }
     }
@@ -110,11 +146,6 @@ public class DaDataHandler
         return Convert.ToBase64String(hashBytes);
     }
 
-    /// <summary>
-    /// Проверяет, является ли запрос запросом на поиск юридического лица по ИНН.
-    /// </summary>
-    /// <param name="path">Путь запроса.</param>
-    /// <returns>true, если запрос на поиск юридического лица по ИНН; иначе false.</returns>
     private static bool IsLegalEntityByInnRequest(string path)
     {
         return path.Contains("findById/party");

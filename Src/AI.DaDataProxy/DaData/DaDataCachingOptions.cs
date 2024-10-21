@@ -32,4 +32,18 @@ public class DaDataCachingOptions
     /// </summary>
     [Range(1, int.MaxValue)]
     public int DefaultCacheDurationInHours { get; set; } = 1;
+    
+    /// <summary>
+    /// Максимальное количество запросов к DaData в сутки.
+    /// Значение 0 означает отсутствие ограничения на количество запросов.
+    /// </summary>
+    [Range(0, int.MaxValue)]
+    public int DailyRequestLimit { get; set; } = 0;
+
+    /// <summary>
+    /// Время жизни (в часах) счетчика запросов в Redis.
+    /// По истечении этого времени счетчик автоматически сбрасывается.
+    /// </summary>
+    [Range(1, int.MaxValue)]
+    public int RequestCounterExpirationHours { get; set; } = 24;
 }

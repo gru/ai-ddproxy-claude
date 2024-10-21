@@ -11,7 +11,7 @@
     </ItemGroup>
     <ItemGroup>
         <PackageReference Include="FluentValidation" />
-        <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" />
+        <PackageReference Include="StackExchange.Redis" />
     </ItemGroup>
     <ItemGroup>
         <InternalsVisibleTo Include="AI.DaDataProxy.Host" />
