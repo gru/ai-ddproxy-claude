@@ -16,6 +16,7 @@ namespace AI.DaDataProxy
         public static IServiceCollection AddDaDataProxyServices(this IServiceCollection services)
         {
             services.AddScoped<DaDataHandler>();
+            services.AddScoped<IRedisCache, RedisCache>();
 
             return services;
         }

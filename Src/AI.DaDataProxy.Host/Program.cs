@@ -51,24 +51,42 @@ builder.Services.AddProblemDetails(options =>
 {
     options.CustomizeProblemDetails = context =>
     {
-        context.ProblemDetails.Extensions.Add("correlationId", Activity.Current?.Id ?? context.HttpContext.TraceIdentifier);
-     
-        if (context.Exception is ValidationException validationException)
+        context.ProblemDetails.Extensions.Add("correlationId",
+            Activity.Current?.Id ?? context.HttpContext.TraceIdentifier);
+
+        var exceptionHandlerFeature = context.HttpContext.Features.Get<IExceptionHandlerFeature>();
+        if (exceptionHandlerFeature != null)
         {
-            context.ProblemDetails.Status = StatusCodes.Status400BadRequest;
-            context.ProblemDetails.Title = "Validation error";
-            context.ProblemDetails.Detail = "One or more validation errors occurred.";
-            context.ProblemDetails.Extensions.Add("errors", validationException.Errors.Select(e => new 
+            if (exceptionHandlerFeature.Error is ValidationException validationException)
             {
-                e.PropertyName,
-                e.ErrorMessage
-            }));
-        }
-        
-        if (builder.Environment.IsDevelopment())
-        {
-            var exceptionHandlerFeature = context.HttpContext.Features.Get<IExceptionHandlerFeature>();
-            if (exceptionHandlerFeature != null)
+                context.HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest; 
+                context.ProblemDetails.Status = StatusCodes.Status400BadRequest;
+                context.ProblemDetails.Title = "Validation error";
+                context.ProblemDetails.Detail = "One or more validation errors occurred.";
+                context.ProblemDetails.Extensions.Add("errors", validationException.Errors.Select(e => new
+                {
+                    e.PropertyName,
+                    e.ErrorMessage
+                }));
+            }
+
+            if (exceptionHandlerFeature.Error is DaDataIntegrationException)
+            {
+                context.HttpContext.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+                context.ProblemDetails.Status = StatusCodes.Status503ServiceUnavailable;
+                context.ProblemDetails.Title = "DaData Integration Error";
+                context.ProblemDetails.Detail = "An error occurred while communicating with the DaData service.";
+            }
+
+            if (exceptionHandlerFeature.Error is DaDataTooManyRequests)
+            {
+                context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+                context.ProblemDetails.Status = StatusCodes.Status429TooManyRequests;
+                context.ProblemDetails.Title = "Too Many Requests";
+                context.ProblemDetails.Detail = "The daily request limit for DaData service has been exceeded.";
+            }
+
+            if (builder.Environment.IsDevelopment())
             {
                 context.ProblemDetails.Detail = exceptionHandlerFeature.Error.Demystify().ToString();
             }
@@ -140,10 +158,7 @@ if (app.Environment.IsDevelopment())
                 description.GroupName);
         }
     });
-}
-else
-{
-    app.UseExceptionHandler();
+    
 }
 
 app.UseHttpsRedirection();

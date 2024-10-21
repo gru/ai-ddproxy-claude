@@ -1,4 +1,5 @@
-﻿using AI.DaDataProxy.DaData;
+﻿using System.Text.Json.Nodes;
+using AI.DaDataProxy.DaData;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.FeatureManagement.Mvc;
 
@@ -29,9 +30,9 @@ public class DaDataController : ControllerBase
     /// <param name="body">Тело запроса в формате JSON.</param>
     /// <returns>Ответ от API DaData в формате JSON.</returns>
     [HttpPost("/suggestions/api/4_1/rs/{*path}")]
-    public async Task<IActionResult> ProxyRequest([FromRoute] string path, [FromBody] string body)
+    public async Task<IActionResult> ProxyRequest([FromRoute] string path, [FromBody] JsonObject body)
     {
-        var result = await _handler.HandleRequestAsync(path, body);
+        var result = await _handler.HandleRequestAsync(path, body.ToJsonString());
         return Content(result, "application/json");
     }
 }

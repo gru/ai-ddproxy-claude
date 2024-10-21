@@ -1,105 +1,93 @@
-﻿using System.Security.Cryptography;
-using System.Text;
-using System.Text.Json;
+﻿using System.Text.Json;
 using Microsoft.Extensions.Options;
 using AI.DaDataProxy.Validators;
-using StackExchange.Redis;
+using RestEase;
 
 namespace AI.DaDataProxy.DaData;
 
+/// <summary>
+/// Обработчик запросов к DaData API с поддержкой кэширования и ограничения количества запросов.
+/// </summary>
 public class DaDataHandler
 {
     private readonly IDaDataApi _daDataApi;
-    private readonly DaDataOptions _options;
     private readonly DaDataCachingOptions _cachingOptions;
-    private readonly IConnectionMultiplexer _redisConnection;
+    private readonly IRedisCache _redisCache;
 
+    /// <summary>
+    /// Инициализирует новый экземпляр класса <see cref="DaDataHandler"/>.
+    /// </summary>
+    /// <param name="daDataApi">Интерфейс для взаимодействия с DaData API.</param>
+    /// <param name="cachingOptions">Настройки кэширования.</param>
+    /// <param name="redisCache">Кэш Redis.</param>
     public DaDataHandler(
         IDaDataApi daDataApi, 
-        IOptions<DaDataOptions> options,
         IOptions<DaDataCachingOptions> cachingOptions,
-        IConnectionMultiplexer redisConnection)
+        IRedisCache redisCache)
     {
         _daDataApi = daDataApi;
-        _options = options.Value;
         _cachingOptions = cachingOptions.Value;
-        _redisConnection = redisConnection;
+        _redisCache = redisCache;
     }
 
+    /// <summary>
+    /// Обрабатывает запрос к DaData API, используя кэширование и проверку лимитов.
+    /// </summary>
+    /// <param name="path">Путь запроса к API.</param>
+    /// <param name="body">Тело запроса в формате JSON.</param>
+    /// <returns>Результат запроса в виде строки JSON.</returns>
+    /// <exception cref="Exception">Возникает, если превышен дневной лимит запросов.</exception>
     public async Task<string> HandleRequestAsync(string path, string body)
     {
-        var counterKey = $"dadata:daily_request_counter:{DateTime.UtcNow:yyyyMMdd}";
-        long currentCount = 0;
-
+        var currentCount = 0L;
+        var utcNow = DateTime.UtcNow;
+        
         if (_cachingOptions.DailyRequestLimit > 0)
         {
-            currentCount = await GetDailyRequestCount(counterKey);
+            currentCount = await _redisCache.GetDailyRequestCountAsync(utcNow);
             if (currentCount >= _cachingOptions.DailyRequestLimit)
             {
-                throw new Exception("Daily request limit exceeded");
+                   throw new DaDataTooManyRequests("Daily request limit exceeded");
             }
         }
 
-        var cacheKey = GenerateCacheKey(path, body);
-        var db = _redisConnection.GetDatabase();
-        var cachedResult = await db.StringGetAsync(cacheKey);
-
-        if (!cachedResult.IsNullOrEmpty)
+        var cacheKey = CacheKeys.RequestCache(path, body);
+        var cachedResult = await _redisCache.GetCachedQueryAsync(cacheKey);
+        if (!string.IsNullOrEmpty(cachedResult))
         {
-            return cachedResult!;
+            return cachedResult;
         }
 
-        var result = await _daDataApi.ProxyRequestAsync(path, body);
-
-        if (!string.IsNullOrEmpty(result))
+        try
         {
-            // Инкрементируем счетчик только после успешного запроса
-            if (_cachingOptions.DailyRequestLimit > 0)
+            var result = await _daDataApi.ProxyRequestAsync(path, body);
+
+            if (!string.IsNullOrEmpty(result))
             {
-                await IncrementDailyRequestCounter(counterKey, currentCount);
+                if (_cachingOptions.DailyRequestLimit > 0)
+                {
+                    await _redisCache.IncrementDailyRequestCounter(utcNow, currentCount);
+                }
+
+                var cacheExpiration = GetCacheExpirationForRequest(path, result);
+                await _redisCache.SetCachedQueryAsync(cacheKey, result, cacheExpiration);
+
+                if (IsLegalEntityByInnRequest(path))
+                {
+                    var legalEntityCacheExpiration = TimeSpan.FromDays(_cachingOptions.LegalEntityCacheDurationInDays);
+                    await CreateAdditionalInnCache(body, result, legalEntityCacheExpiration);
+                }
             }
 
-            var cacheExpiration = GetCacheExpirationForRequest(path, body, result);
-            await db.StringSetAsync(cacheKey, result, cacheExpiration);
-
-            if (IsLegalEntityByInnRequest(path))
-            {
-                await CreateAdditionalInnCache(body, result, cacheExpiration);
-            }
+            return result;
         }
-
-        return result;
-    }
-
-    private async Task<long> GetDailyRequestCount(string counterKey)
-    {
-        var db = _redisConnection.GetDatabase();
-        var currentCount = await db.StringGetAsync(counterKey);
-        return currentCount.HasValue ? (long)currentCount : 0;
-    }
-
-    private async Task IncrementDailyRequestCounter(string counterKey, long currentCount)
-    {
-        var db = _redisConnection.GetDatabase();
-
-        var transaction = db.CreateTransaction();
-        var incrementTask = transaction.StringIncrementAsync(counterKey);
-
-        // Устанавливаем время жизни ключа только если это новый ключ (текущее значение 0)
-        if (currentCount == 0)
+        catch (ApiException ex)
         {
-            await transaction.KeyExpireAsync(counterKey, TimeSpan.FromHours(_cachingOptions.RequestCounterExpirationHours));
+            throw new DaDataIntegrationException("Ошибка при обращении к сервису DaData", ex);
         }
-        
-        if (!await transaction.ExecuteAsync())
-        {
-            throw new Exception("Failed to increment request counter");
-        }
-
-        await incrementTask;
     }
-    
-    private TimeSpan GetCacheExpirationForRequest(string path, string body, string result)
+
+    private TimeSpan GetCacheExpirationForRequest(string path, string result)
     {
         if (IsLegalEntityByInnRequest(path))
         {
@@ -113,7 +101,7 @@ public class DaDataHandler
                 return TimeSpan.FromDays(_cachingOptions.EmptyLegalEntityCacheDurationInDays);
             }
         }
-        else if (path.Contains("address"))
+        else if (IsAddressRequest(path))
         {
             return TimeSpan.FromDays(_cachingOptions.AddressCacheDurationInDays);
         }
@@ -131,23 +119,13 @@ public class DaDataHandler
             var inn = queryElement.GetString();
             if (InnValidator.IsValid(inn))
             {
-                var innCacheKey = $"inn:{inn}";
-                var db = _redisConnection.GetDatabase();
-                await db.StringSetAsync(innCacheKey, result, expiration);
+                var innCacheKey = CacheKeys.InnQueryCache(inn!);
+                await _redisCache.SetCachedQueryAsync(innCacheKey, result, expiration);
             }
         }
     }
 
-    private static string GenerateCacheKey(string path, string body)
-    {
-        using var sha256 = SHA256.Create();
-        var inputBytes = Encoding.UTF8.GetBytes($"{path}:{body}");
-        var hashBytes = sha256.ComputeHash(inputBytes);
-        return Convert.ToBase64String(hashBytes);
-    }
-
-    private static bool IsLegalEntityByInnRequest(string path)
-    {
-        return path.Contains("findById/party");
-    }
+    private static bool IsLegalEntityByInnRequest(string path) => path.Contains("findById/party");
+    
+    private static bool IsAddressRequest(string path) => path.Contains("address");
 }
