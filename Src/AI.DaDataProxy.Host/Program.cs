@@ -63,7 +63,7 @@ builder.Services.AddProblemDetails(options =>
                 context.ProblemDetails.Detail = "An error occurred while communicating with the DaData service.";
             }
 
-            if (exceptionHandlerFeature.Error is DaDataTooManyRequests)
+            if (exceptionHandlerFeature.Error is DaDataTooManyRequestsException)
             {
                 context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
                 context.ProblemDetails.Status = StatusCodes.Status429TooManyRequests;

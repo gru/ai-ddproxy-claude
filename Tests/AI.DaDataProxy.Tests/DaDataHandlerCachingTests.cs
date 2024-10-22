@@ -96,7 +96,7 @@ namespace AI.DaDataProxy.Tests
         }
 
         /// <summary>
-        /// Проверяет, что при превышении дневного лимита запросов выбрасывается исключение DaDataTooManyRequests.
+        /// Проверяет, что при превышении дневного лимита запросов выбрасывается исключение DaDataTooManyRequestsException.
         /// </summary>
         [Fact]
         public async Task ProxyRequest_DailyLimitExceeded_ThrowsDaDataTooManyRequests()

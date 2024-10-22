@@ -47,7 +47,7 @@ public class DaDataHandler
             currentCount = await _redisCache.GetDailyRequestCountAsync(utcNow);
             if (currentCount >= _cachingOptions.DailyRequestLimit)
             {
-                   throw new DaDataTooManyRequests("Daily request limit exceeded");
+                   throw new DaDataTooManyRequestsException("Daily request limit exceeded");
             }
         }
 
