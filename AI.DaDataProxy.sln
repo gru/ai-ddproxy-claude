@@ -1,5 +1,5 @@
 ﻿Microsoft Visual Studio Solution File, Format Version 12.00
-# 
+#
 VisualStudioVersion = 17.5.002.0
 MinimumVisualStudioVersion = 
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AI.DaDataProxy", "Src\AI.DaDataProxy\AI.DaDataProxy.csproj", "{B345E7AE-58D3-4AA8-95B7-1B0AE9CB52E6}"
@@ -35,6 +35,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".SolutionItems", ".Solution
 		suggest-address.ps1 = suggest-address.ps1
 		suggest-inn.ps1 = suggest-inn.ps1
 		get-dadata-keys.ps1 = get-dadata-keys.ps1
+		suggest-address-proxy.ps1 = suggest-address-proxy.ps1
+		suggest-inn-proxy.ps1 = suggest-inn-proxy.ps1
 	EndProjectSection
 EndProject
 Global

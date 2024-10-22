@@ -1,30 +1,38 @@
-﻿# [Your Microservice Name]
+﻿# AI.DaDataProxy
 
 ## Overview
-[Provide a brief description of your microservice, its purpose, and its role within the larger system architecture.]
+AI.DaDataProxy is a microservice that serves as a proxy for the DaData API. It provides request caching, rate limiting, and special handling for certain types of requests, such as searching for legal entities by INN (Taxpayer Identification Number).
 
 ## Table of Contents
-- [Features](#features)
-- [Prerequisites](#prerequisites)
-- [Getting Started](#getting-started)
+- [AI.DaDataProxy](#aidadataproxy)
+  - [Overview](#overview)
+  - [Table of Contents](#table-of-contents)
+  - [Features](#features)
+  - [Requirements](#requirements)
+  - [Getting Started](#getting-started)
     - [Installation](#installation)
     - [Configuration](#configuration)
-- [Usage](#usage)
-- [API Documentation](#api-documentation)
-- [Database](#database)
-- [Testing](#testing)
-- [Deployment](#deployment)
-- [Monitoring and Logging](#monitoring-and-logging)
-- [Contributing](#contributing)
-- [License](#license)
+  - [Usage](#usage)
+    - [Local Development](#local-development)
+    - [Docker Compose](#docker-compose)
+  - [API Documentation](#api-documentation)
+  - [Testing](#testing)
+  - [Deployment](#deployment)
+  - [Monitoring and Logging](#monitoring-and-logging)
+  - [Contributing](#contributing)
+  - [License](#license)
 
 ## Features
-- [List key features of your microservice]
+- Proxying requests to the DaData API
+- Caching requests and responses using Redis
+- Rate limiting for DaData API requests
+- Special handling of requests for legal entities by INN
+- Configurable cache lifetime for different types of requests
 
-## Prerequisites
+## Requirements
 - .NET 8 SDK
-- PostgreSQL
-- [Any other dependencies or tools required]
+- Docker and Docker Compose
+- Redis
 
 ## Getting Started
 
@@ -35,7 +43,7 @@
    ```
 2. Navigate to the project directory:
    ```
-   cd [your-project-name]
+   cd AI.DaDataProxy
    ```
 3. Restore dependencies:
    ```
@@ -43,30 +51,32 @@
    ```
 
 ### Configuration
-1. Update the connection string in `appsettings.json` or use user secrets for local development.
-2. [Any other configuration steps]
+1. Update the connection strings in `appsettings.json` and `appsettings.Development.json`.
+2. Configure DaData and caching parameters in `appsettings.json`.
+3. For local development, use user secrets to store sensitive data.
 
 ## Usage
-[Provide instructions on how to use your microservice, including any CLI commands, API endpoints, etc.]
+
+### Local Development
+Run the application:
+```
+dotnet run --project Src/AI.DaDataProxy.Host
+```
+
+### Docker Compose
+Run the application using Docker Compose:
+```
+docker-compose up
+```
 
 ## API Documentation
 The API documentation is available via Swagger UI when running the application in development mode. Access it at:
 
 ```
-https://localhost:5001/swagger
+http://localhost:5000/swagger
 ```
 
 [Include any additional API documentation or link to external API docs]
-
-## Database
-This microservice uses Entity Framework Core with PostgreSQL. To set up the database:
-
-1. Ensure PostgreSQL is installed and running.
-2. Update the connection string in `appsettings.json`.
-3. Run migrations:
-   ```
-   dotnet ef database update
-   ```
 
 ## Testing
 To run the tests:
