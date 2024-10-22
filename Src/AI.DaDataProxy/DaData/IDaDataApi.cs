@@ -15,5 +15,5 @@ public interface IDaDataApi
     /// <param name="body">Тело запроса в формате JSON.</param>
     /// <returns>Ответ от API DaData в формате JSON.</returns>
     [Post("suggestions/api/4_1/rs/{path}")]
-    Task<string> ProxyRequestAsync([Path] string path, [Body] string body);
+    Task<string> ProxyRequestAsync([Path(UrlEncode = false)] string path, [Body] string body);
 }

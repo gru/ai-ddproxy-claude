@@ -1,4 +1,7 @@
 ﻿Microsoft Visual Studio Solution File, Format Version 12.00
+# 
+VisualStudioVersion = 17.5.002.0
+MinimumVisualStudioVersion = 
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AI.DaDataProxy", "Src\AI.DaDataProxy\AI.DaDataProxy.csproj", "{B345E7AE-58D3-4AA8-95B7-1B0AE9CB52E6}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AI.DaDataProxy.Entities", "Src\AI.DaDataProxy.Entities\AI.DaDataProxy.Entities.csproj", "{9B8ACE82-868A-46BA-BF77-167624CEC483}"
@@ -29,6 +32,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".SolutionItems", ".Solution
 		AddMigration.cmd = AddMigration.cmd
 		AddMigration.ps1 = AddMigration.ps1
 		add-migration.sh = add-migration.sh
+		suggest-address.ps1 = suggest-address.ps1
+		suggest-inn.ps1 = suggest-inn.ps1
+		get-dadata-keys.ps1 = get-dadata-keys.ps1
 	EndProjectSection
 EndProject
 Global
@@ -61,6 +67,9 @@ Global
 		{4D129D0F-4DBB-46E2-B813-77660AD7721A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4D129D0F-4DBB-46E2-B813-77660AD7721A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4D129D0F-4DBB-46E2-B813-77660AD7721A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{4D129D0F-4DBB-46E2-B813-77660AD7721A} = {40ADDB54-35F5-4F25-A12D-D0749FD3B163}

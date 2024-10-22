@@ -4,10 +4,7 @@ using AI.DaDataProxy;
 using AI.DaDataProxy.DaData;
 using AI.DaDataProxy.Entities;
 using Microsoft.FeatureManagement;
-using Microsoft.OpenApi.Models;
 using Serilog;
-using Asp.Versioning;
-using Asp.Versioning.ApiExplorer;
 using Microsoft.Extensions.Options;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using FluentValidation;
@@ -34,18 +31,6 @@ builder.Host.UseSerilog();
 
 builder.Services.AddControllers();
 builder.Services.AddFeatureManagement();
-
-builder.Services.AddApiVersioning(options =>
-{
-    options.DefaultApiVersion = new ApiVersion(1, 0);
-    options.AssumeDefaultVersionWhenUnspecified = true;
-    options.ReportApiVersions = true;
-})
-.AddApiExplorer(options =>
-{
-    options.GroupNameFormat = "'v'VVV";
-    options.SubstituteApiVersionInUrl = true;
-});
 
 builder.Services.AddProblemDetails(options =>
 {
@@ -128,19 +113,6 @@ builder.Services.AddDaDataProxyServices();
 
 var app = builder.Build();
 
-var versionProvider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
-var swaggerGenOptions = app.Services.GetRequiredService<IOptions<SwaggerGenOptions>>();
-
-foreach (var description in versionProvider.ApiVersionDescriptions)
-{
-    swaggerGenOptions.Value.SwaggerGeneratorOptions.SwaggerDocs.Add(
-        description.GroupName,
-        new OpenApiInfo
-        {
-            Title = $"AI.DaDataProxy API {description.ApiVersion}",
-            Version = description.ApiVersion.ToString()
-        });
-}
 
 var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
 var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
@@ -151,14 +123,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI(options =>
     {
-        foreach (var description in versionProvider.ApiVersionDescriptions)
-        {
-            options.SwaggerEndpoint(
-                $"/swagger/{description.GroupName}/swagger.json",
-                description.GroupName);
-        }
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "v1");
     });
-    
 }
 
 app.UseHttpsRedirection();
