@@ -11,6 +11,9 @@ using System.Net.Http.Json;
 
 namespace AI.DaDataProxy.Tests
 {
+    /// <summary>
+    /// Тесты для проверки функциональности кэширования в DaDataHandler.
+    /// </summary>
     public class DaDataHandlerCachingTests : IClassFixture<WebApplicationFactory<Program>>
     {
         private readonly WebApplicationFactory<Program> _factory;
@@ -18,6 +21,10 @@ namespace AI.DaDataProxy.Tests
         private readonly IRedisCache _mockRedisCache;
         private readonly IDaDataApi _mockDaDataApi;
 
+        /// <summary>
+        /// Инициализирует новый экземпляр класса DaDataHandlerCachingTests.
+        /// </summary>
+        /// <param name="factory">Фабрика веб-приложения для создания тестового сервера.</param>
         public DaDataHandlerCachingTests(WebApplicationFactory<Program> factory)
         {
             _mockRedisCache = Substitute.For<IRedisCache>();
@@ -42,6 +49,9 @@ namespace AI.DaDataProxy.Tests
             _client = RestClient.For<IDaDataController>(client);
         }
 
+        /// <summary>
+        /// Проверяет, что при наличии кэшированного результата возвращаются кэшированные данные.
+        /// </summary>
         [Fact]
         public async Task ProxyRequest_CachedResult_ReturnsCachedData()
         {
@@ -60,6 +70,9 @@ namespace AI.DaDataProxy.Tests
             Assert.Equal(cachedResult, result);
         }
 
+        /// <summary>
+        /// Проверяет, что при отсутствии кэшированного результата вызывается API и результат кэшируется.
+        /// </summary>
         [Fact]
         public async Task ProxyRequest_NoCachedResult_CallsApiAndCachesResult()
         {
@@ -82,6 +95,9 @@ namespace AI.DaDataProxy.Tests
                 Arg.Any<TimeSpan>());
         }
 
+        /// <summary>
+        /// Проверяет, что при превышении дневного лимита запросов выбрасывается исключение DaDataTooManyRequests.
+        /// </summary>
         [Fact]
         public async Task ProxyRequest_DailyLimitExceeded_ThrowsDaDataTooManyRequests()
         {
@@ -97,6 +113,9 @@ namespace AI.DaDataProxy.Tests
             Assert.Equal(HttpStatusCode.TooManyRequests, ex.StatusCode);
         }
 
+        /// <summary>
+        /// Проверяет, что для запроса юридического лица по ИНН используется правильное время истечения кэша.
+        /// </summary>
         [Fact]
         public async Task ProxyRequest_LegalEntityByInnRequest_UsesCorrectCacheExpiration()
         {
